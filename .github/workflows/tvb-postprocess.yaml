@@ -23,6 +23,6 @@ jobs:
           enable-cache: false
       
       - name: Execute script
-        run: python scripts/tvb_postprocess.py
+        run: uv run scripts/tvb_postprocess.py
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
