@@ -12,7 +12,7 @@ on:
 
 jobs:
   Organize:
-    runs-on: arc-calvinz360-home-ops
+    runs-on: arc-calvinz360-home-labs
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
