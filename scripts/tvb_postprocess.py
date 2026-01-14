@@ -1,7 +1,7 @@
 import os
 import shutil
 import re
-from pathlib import Path
+import sys
 
 # Configuration
 SOURCE_DIR = "/mnt/data/torrents/"
@@ -35,6 +35,7 @@ def process_files(dry_run=True):
         print(f"ERROR: Source directory not found: {SOURCE_DIR}")
         return
     
+    print(f"Running in {'DRY-RUN' if dry_run else 'LIVE'} mode\n")
     files_moved = 0
     
     for item in os.listdir(SOURCE_DIR):
@@ -93,6 +94,12 @@ def process_files(dry_run=True):
     print(f"\nCompleted. Files moved: {files_moved}")
 
 if __name__ == "__main__":
-    # Set to False to actually move files
-    DRY_RUN = True
-    process_files(dry_run=DRY_RUN)
+    # Get dry-run setting from environment variable or command line
+    dry_run_env = os.getenv("DRY_RUN", "true").lower()
+    dry_run = dry_run_env in ["true", "1", "yes"]
+    
+    # Override with command line argument if provided
+    if len(sys.argv) > 1:
+        dry_run = sys.argv[1].lower() not in ["false", "0", "no", "live"]
+    
+    process_files(dry_run=dry_run)
