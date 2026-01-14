@@ -1,3 +1,9 @@
+# scripts/tvb_postprocess.py
+# /// script
+# requires-python = ">=3.8"
+# dependencies = []
+# ///
+
 import os
 import shutil
 import re
