@@ -75,5 +75,9 @@ jobs:
 
           echo "Zipaligning to whatsapp_${VERSION}.apk ..."
           zipalign -v -p 4 /mnt/data/whatsapp_fixed.apk /mnt/data/whatsapp_${VERSION}.apk
+          
+          echo "Cleaning up ..."
+          rm -rf /mnt/data/whatsapp_new
+          rm -f /mnt/data/whatsapp_fixed.apk
 
           ls -lh /mnt/data/whatsapp_${VERSION}.apk || echo "Final APK not found — check previous steps"
