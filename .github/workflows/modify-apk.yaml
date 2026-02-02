@@ -23,7 +23,7 @@ jobs:
       - name: Install apktool
         run: |
           wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool
-          wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.12.1.jar -O apktool.jar
+          wget https://github.com/iBotPeaches/Apktool/releases/download/v2.12.1/apktool_2.12.1.jar -O apktool.jar
           chmod +x apktool
           sudo mv apktool apktool.jar /usr/local/bin/
 
@@ -49,19 +49,20 @@ jobs:
 
       - name: Rebuild WhatsApp APK
         env:
-          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+          ANDROID_HOME: ~/android-sdk
           BUILD_TOOLS: 35.0.0
           VERSION: ${{ inputs.version || 'latest' }}
         run: |
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$BUILD_TOOLS:$PATH"
 
-          cd /data
-
           echo "Decompiling WhatsApp.apk ..."
-          apktool d WhatsApp.apk -o whatsapp_new --res-resolve-mode dummy
+          apktool d /mnt/data/WhatsApp.apk -o /mnt/data/whatsapp_new --res-resolve-mode dummy
+
+          echo "Updating AndroidManifest.xml ..."
+          sed -i 's/android:extractNativeLibs="false"/android:extractNativeLibs="true"/' /mnt/data/whatsapp_new/AndroidManifest.xml
 
           echo "Rebuilding ..."
-          apktool b whatsapp_new -o whatsapp_fixed.apk --use-aapt1 --no-crunch
+          apktool b /mnt/data/whatsapp_new -o /mnt/data/whatsapp_fixed.apk --use-aapt1 --no-crunch
 
           echo "Signing with debug key ..."
           jarsigner -verbose \
@@ -70,9 +71,13 @@ jobs:
             -keystore debug.keystore \
             -storepass android \
             -keypass android \
-            whatsapp_fixed.apk androiddebugkey
+            /mnt/data/whatsapp_fixed.apk androiddebugkey
 
           echo "Zipaligning to whatsapp_${VERSION}.apk ..."
-          zipalign -v -p 4 whatsapp_fixed.apk whatsapp_${VERSION}.apk
+          zipalign -v -p 4 /mnt/data/whatsapp_fixed.apk /mnt/data/whatsapp_${VERSION}.apk
+          
+          echo "Cleaning up ..."
+          rm -rf /mnt/data/whatsapp_new
+          rm -f /mnt/data/whatsapp_fixed.apk
 
-          ls -lh whatsapp_${VERSION}.apk || echo "Final APK not found — check previous steps"
+          ls -lh /mnt/data/whatsapp_${VERSION}.apk || echo "Final APK not found — check previous steps"
