@@ -55,13 +55,11 @@ jobs:
         run: |
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$BUILD_TOOLS:$PATH"
 
-          cd /data
-
           echo "Decompiling WhatsApp.apk ..."
-          apktool d WhatsApp.apk -o whatsapp_new --res-resolve-mode dummy
+          apktool d /mnt/data/WhatsApp.apk -o /mnt/data/whatsapp_new --res-resolve-mode dummy
 
           echo "Rebuilding ..."
-          apktool b whatsapp_new -o whatsapp_fixed.apk --use-aapt1 --no-crunch
+          apktool b /mnt/data/whatsapp_new -o /mnt/data/whatsapp_fixed.apk --use-aapt1 --no-crunch
 
           echo "Signing with debug key ..."
           jarsigner -verbose \
@@ -70,9 +68,9 @@ jobs:
             -keystore debug.keystore \
             -storepass android \
             -keypass android \
-            whatsapp_fixed.apk androiddebugkey
+            /mnt/data/whatsapp_fixed.apk androiddebugkey
 
           echo "Zipaligning to whatsapp_${VERSION}.apk ..."
-          zipalign -v -p 4 whatsapp_fixed.apk whatsapp_${VERSION}.apk
+          zipalign -v -p 4 /mnt/data/whatsapp_fixed.apk /mnt/data/whatsapp_${VERSION}.apk
 
-          ls -lh whatsapp_${VERSION}.apk || echo "Final APK not found — check previous steps"
+          ls -lh /mnt/data/whatsapp_${VERSION}.apk || echo "Final APK not found — check previous steps"
