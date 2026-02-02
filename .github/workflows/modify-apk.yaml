@@ -49,7 +49,7 @@ jobs:
 
       - name: Rebuild WhatsApp APK
         env:
-          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+          ANDROID_HOME: ~/android-sdk
           BUILD_TOOLS: 35.0.0
           VERSION: ${{ inputs.version || 'latest' }}
         run: |
@@ -57,6 +57,9 @@ jobs:
 
           echo "Decompiling WhatsApp.apk ..."
           apktool d /mnt/data/WhatsApp.apk -o /mnt/data/whatsapp_new --res-resolve-mode dummy
+
+          echo "Updating AndroidManifest.xml ..."
+          sed -i 's/android:extractNativeLibs="false"/android:extractNativeLibs="true"/' /mnt/data/whatsapp_new/AndroidManifest.xml
 
           echo "Rebuilding ..."
           apktool b /mnt/data/whatsapp_new -o /mnt/data/whatsapp_fixed.apk --use-aapt1 --no-crunch
