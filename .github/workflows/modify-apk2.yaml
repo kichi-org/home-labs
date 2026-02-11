@@ -1,0 +1,71 @@
+name: Modify and Rebuild WhatsApp APK (APKEditor)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'WhatsApp version tag (used in output filename)'
+        required: false
+        default: 'latest'
+        type: string
+
+jobs:
+  rebuild:
+    runs-on: home-labs-runner
+
+    steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Get APKEditor
+        run: |
+          wget https://github.com/REAndroid/APKEditor/releases/download/V1.4.7/APKEditor-1.4.7.jar
+      - name: Install zipalign and apksigner
+        run: |
+          mkdir -p ~/android-sdk/cmdline-tools
+          cd ~/android-sdk/cmdline-tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip -O cmdline.zip
+          unzip -q cmdline.zip
+          mv cmdline-tools latest
+          yes | ./latest/bin/sdkmanager --licenses >/dev/null 2>&1
+          ./latest/bin/sdkmanager --update
+          ./latest/bin/sdkmanager "build-tools;35.0.0" "platform-tools"
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+      - name: Rebuild WhatsApp APK
+        env:
+          ANDROID_HOME: ~/android-sdk
+          BUILD_TOOLS: 35.0.0
+          VERSION: ${{ inputs.version || 'latest' }}
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$BUILD_TOOLS:$PATH"
+          echo "Decompiling WhatsApp.apk ..."
+          java -jar APKEditor-1.4.7.jar d /mnt/data/WhatsApp.apk -o /mnt/data/whatsapp_new
+          echo "Updating AndroidManifest.xml ..."
+          sed -i 's/android:extractNativeLibs="false"/android:extractNativeLibs="true"/' /mnt/data/whatsapp_new/AndroidManifest.xml
+          echo "Rebuilding ..."
+          java -jar APKEditor-1.4.7.jar b -i /mnt/data/whatsapp_new -o /mnt/data/whatsapp_fixed.apk
+          echo "Signing with debug key ..."
+          jarsigner -verbose \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            -keystore debug.keystore \
+            -storepass android \
+            -keypass android \
+            /mnt/data/whatsapp_fixed.apk androiddebugkey
+          echo "Zipaligning to whatsapp_${VERSION}.apk ..."
+          zipalign -v -p 4 /mnt/data/whatsapp_fixed.apk /mnt/data/whatsapp_${VERSION}.apk
+          
+          echo "Cleaning up ..."
+          rm -rf /mnt/data/whatsapp_new
+          rm -f /mnt/data/whatsapp_fixed.apk
+          ls -lh /mnt/data/whatsapp_${VERSION}.apk || echo "Final APK not found — check previous steps"
