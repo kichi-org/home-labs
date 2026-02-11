@@ -36,7 +36,7 @@ jobs:
           mv cmdline-tools latest
           yes | ./latest/bin/sdkmanager --licenses >/dev/null 2>&1
           ./latest/bin/sdkmanager --update
-          ./latest/bin/sdkmanager "build-tools;35.0.0" "platform-tools"
+          ./latest/bin/sdkmanager "build-tools;36.0.0" "platform-tools"
 
       - name: Generate debug keystore
         run: |
@@ -50,7 +50,7 @@ jobs:
       - name: Rebuild WhatsApp APK
         env:
           ANDROID_HOME: ~/android-sdk
-          BUILD_TOOLS: 35.0.0
+          BUILD_TOOLS: 36.0.0
           VERSION: ${{ inputs.version || 'latest' }}
         run: |
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$BUILD_TOOLS:$PATH"
