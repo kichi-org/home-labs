@@ -39,7 +39,6 @@ jobs:
             -keystore debug.keystore \
             -alias androiddebugkey \
             -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
       - name: Rebuild WhatsApp APK
         env:
@@ -54,17 +53,13 @@ jobs:
           sed -i 's/android:extractNativeLibs="false"/android:extractNativeLibs="true"/' /mnt/data/whatsapp_new/AndroidManifest.xml
           echo "Rebuilding ..."
           java -jar APKEditor-1.4.7.jar b -i /mnt/data/whatsapp_new -o /mnt/data/whatsapp_fixed.apk
-          echo "Signing with debug key ..."
-          jarsigner -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore debug.keystore \
-            -storepass android \
-            -keypass android \
-            /mnt/data/whatsapp_fixed.apk androiddebugkey
           echo "Zipaligning to whatsapp_${VERSION}.apk ..."
           zipalign -v -p 4 /mnt/data/whatsapp_fixed.apk /mnt/data/whatsapp_${VERSION}.apk
-          
+          echo "Signing with debug key ..."
+          apksigner sign \
+            --ks-key-alias androiddebugkey \
+            --ks debug.keystore \
+            /mnt/data/whatsapp_${VERSION}.apk         
           echo "Cleaning up ..."
           rm -rf /mnt/data/whatsapp_new
           rm -f /mnt/data/whatsapp_fixed.apk
