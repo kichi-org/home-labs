@@ -39,6 +39,7 @@ jobs:
             -keystore debug.keystore \
             -alias androiddebugkey \
             -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
       - name: Rebuild WhatsApp APK
         env:
@@ -59,6 +60,8 @@ jobs:
           apksigner sign \
             --ks-key-alias androiddebugkey \
             --ks debug.keystore \
+            --ks-pass android \
+            --key-pass android \
             /mnt/data/whatsapp_${VERSION}.apk         
           echo "Cleaning up ..."
           rm -rf /mnt/data/whatsapp_new
