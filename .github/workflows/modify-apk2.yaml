@@ -53,17 +53,16 @@ jobs:
           echo "Updating AndroidManifest.xml ..."
           sed -i 's/android:extractNativeLibs="false"/android:extractNativeLibs="true"/' /mnt/data/whatsapp_new/AndroidManifest.xml
           echo "Rebuilding ..."
-          java -jar APKEditor-1.4.7.jar b -i /mnt/data/whatsapp_new -o /mnt/data/whatsapp_fixed.apk
-          echo "Zipaligning to whatsapp_${VERSION}.apk ..."
-          zipalign -v -p 4 /mnt/data/whatsapp_fixed.apk /mnt/data/whatsapp_${VERSION}.apk
-          echo "Signing with debug key ..."
+          java -jar APKEditor-1.4.7.jar b -i /mnt/data/whatsapp_new -o /mnt/data/whatsapp_${VERSION}.apk
+          echo "Align and Signing with debug key ..."
           apksigner sign \
             --ks-key-alias androiddebugkey \
             --ks debug.keystore \
-            --ks-pass android \
-            --key-pass android \
-            /mnt/data/whatsapp_${VERSION}.apk         
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            /mnt/data/whatsapp_${VERSION}.apk
+          echo "Verify apk signature"
+          apksigner verify --verbose /mnt/data/whatsapp_${VERSION}.apk
           echo "Cleaning up ..."
           rm -rf /mnt/data/whatsapp_new
-          rm -f /mnt/data/whatsapp_fixed.apk
           ls -lh /mnt/data/whatsapp_${VERSION}.apk || echo "Final APK not found — check previous steps"
