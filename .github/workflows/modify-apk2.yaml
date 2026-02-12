@@ -49,20 +49,20 @@ jobs:
         run: |
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/$BUILD_TOOLS:$PATH"
           echo "Decompiling WhatsApp.apk ..."
-          java -jar APKEditor-1.4.7.jar d -i /mnt/data/WhatsApp.apk -o /mnt/data/whatsapp_new
+          cp /mnt/data/WhatsApp.apk ./WhatsApp.apk
+          java -jar APKEditor-1.4.7.jar d -i ./WhatsApp.apk -o ./whatsapp_new
           echo "Updating AndroidManifest.xml ..."
-          sed -i 's/android:extractNativeLibs="false"/android:extractNativeLibs="true"/' /mnt/data/whatsapp_new/AndroidManifest.xml
+          sed -i 's/android:extractNativeLibs="false"/android:extractNativeLibs="true"/' ./whatsapp_new/AndroidManifest.xml
           echo "Rebuilding ..."
-          java -jar APKEditor-1.4.7.jar b -i /mnt/data/whatsapp_new -o /mnt/data/whatsapp_${VERSION}.apk
+          java -jar APKEditor-1.4.7.jar b -i ./whatsapp_new -o ./whatsapp_${VERSION}.apk
           echo "Align and Signing with debug key ..."
           apksigner sign \
             --ks-key-alias androiddebugkey \
             --ks debug.keystore \
             --ks-pass pass:android \
             --key-pass pass:android \
-            /mnt/data/whatsapp_${VERSION}.apk
+            ./whatsapp_${VERSION}.apk
           echo "Verify apk signature"
-          apksigner verify --verbose /mnt/data/whatsapp_${VERSION}.apk
-          echo "Cleaning up ..."
-          rm -rf /mnt/data/whatsapp_new
+          apksigner verify --verbose ./whatsapp_${VERSION}.apk
+          mv ./whatsapp_${VERSION}.apk /mnt/data/whatsapp_${VERSION}.apk
           ls -lh /mnt/data/whatsapp_${VERSION}.apk || echo "Final APK not found — check previous steps"
