@@ -1,0 +1,184 @@
+name: Modify and Rebuild WhatsApp APK (APKEditor)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'WhatsApp version tag (used in output filename)'
+        required: false
+        default: 'latest'
+        type: string
+      apk_path:
+        description: 'Path to WhatsApp APK'
+        required: false
+        default: '/mnt/data/WhatsApp.apk'
+        type: string
+
+env:
+  ANDROID_HOME: ~/android-sdk
+  BUILD_TOOLS_VERSION: '35.0.0'
+  APKEDITOR_VERSION: '1.4.7'
+
+jobs:
+  rebuild:
+    runs-on: home-labs-runner
+
+    steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Get APKEditor
+        run: |
+          wget https://github.com/REAndroid/APKEditor/releases/download/V1.4.7/APKEditor-1.4.7.jar
+
+      - name: Install Android Build Tools
+        run: |
+          mkdir -p ${{ env.ANDROID_HOME }}/cmdline-tools
+          cd ${{ env.ANDROID_HOME }}/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip -O cmdline.zip
+          unzip -q cmdline.zip
+          mv cmdline-tools latest
+          yes | ./latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+          ./latest/bin/sdkmanager --update
+          ./latest/bin/sdkmanager "build-tools;${{ env.BUILD_TOOLS_VERSION }}" "platform-tools"
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+      
+      - name: Verify input APK exists
+        run: |
+          if [ ! -f "${{ inputs.apk_path }}" ]; then
+            echo "❌ Error: APK not found at ${{ inputs.apk_path }}"
+            exit 1
+          fi
+          echo "✓ APK found: ${{ inputs.apk_path }}"
+          echo "APK size: $(du -h ${{ inputs.apk_path }} | cut -f1)"
+      
+      - name: Set version
+        id: version
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
+            VERSION=$(date +%Y%m%d_%H%M%S)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+      
+      - name: Decompile APK
+        run: |
+          export PATH="${{ env.ANDROID_HOME }}/cmdline-tools/latest/bin:${{ env.ANDROID_HOME }}/build-tools/${{ env.BUILD_TOOLS_VERSION }}:$PATH"
+          
+          echo "🔨 Decompiling WhatsApp.apk with APKEditor..."
+          cp "${{ inputs.apk_path }}" ./WhatsApp.apk
+          
+          java -jar APKEditor-${{ env.APKEDITOR_VERSION }}.jar d -i ./WhatsApp.apk -o ./whatsapp_new
+          
+          if [ ! -f ./whatsapp_new/AndroidManifest.xml ]; then
+            echo "❌ Error: AndroidManifest.xml not found after decompiling"
+            exit 1
+          fi
+          
+          echo "✓ Decompiled successfully"
+
+      - name: Modify AndroidManifest.xml
+        run: |
+          echo "📝 Modifying AndroidManifest.xml..."
+          
+          MANIFEST="./whatsapp_new/AndroidManifest.xml"
+          cp "$MANIFEST" "${MANIFEST}.bak"
+          
+          if grep -q 'android:extractNativeLibs="false"' "$MANIFEST"; then
+            sed -i 's/android:extractNativeLibs="false"/android:extractNativeLibs="true"/' "$MANIFEST"
+            echo "✓ Changed extractNativeLibs from false to true"
+          elif grep -q 'android:extractNativeLibs="true"' "$MANIFEST"; then
+            echo "✓ extractNativeLibs is already set to true"
+          else
+            echo "⚠️  extractNativeLibs attribute not found"
+          fi
+          
+          echo ""
+          echo "Changes made:"
+          diff "${MANIFEST}.bak" "$MANIFEST" || true
+      
+      - name: Rebuild APK
+        run: |
+          echo "🔧 Rebuilding APK with APKEditor..."
+          
+          java -jar APKEditor-${{ env.APKEDITOR_VERSION }}.jar b \
+            -i ./whatsapp_new \
+            -o ./whatsapp_${{ steps.version.outputs.version }}.apk
+          
+          if [ ! -f ./whatsapp_${{ steps.version.outputs.version }}.apk ]; then
+            echo "❌ Error: Rebuild failed - APK not created"
+            exit 1
+          fi
+          
+          echo "✓ APK rebuilt successfully"
+      
+      - name: Sign APK
+        run: |
+          export PATH="${{ env.ANDROID_HOME }}/build-tools/${{ env.BUILD_TOOLS_VERSION }}:$PATH"
+          
+          echo "✍️ Signing APK with apksigner (includes zipalign)..."
+          
+          apksigner sign \
+            --ks-key-alias androiddebugkey \
+            --ks debug.keystore \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            ./whatsapp_${{ steps.version.outputs.version }}.apk
+          
+          echo "✓ APK signed successfully"
+      
+      - name: Verify APK
+        run: |
+          export PATH="${{ env.ANDROID_HOME }}/build-tools/${{ env.BUILD_TOOLS_VERSION }}:$PATH"
+          
+          echo "🔍 Verifying APK signature..."
+          
+          if apksigner verify --verbose ./whatsapp_${{ steps.version.outputs.version }}.apk; then
+            echo "✓ APK signature verified successfully"
+          else
+            echo "❌ APK verification failed"
+            exit 1
+          fi
+      
+      - name: Generate APK info
+        id: apk-info
+        run: |
+          APK_FILE="./whatsapp_${{ steps.version.outputs.version }}.apk"
+          
+          SIZE=$(du -h "$APK_FILE" | cut -f1)
+          MD5=$(md5sum "$APK_FILE" | cut -d' ' -f1)
+          SHA256=$(sha256sum "$APK_FILE" | cut -d' ' -f1)
+          
+          echo "size=$SIZE" >> $GITHUB_OUTPUT
+          echo "md5=$MD5" >> $GITHUB_OUTPUT
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "📊 APK Information:"
+          echo "  Size: $SIZE"
+          echo "  MD5: $MD5"
+          echo "  SHA256: $SHA256"
+      
+      - name: Move to final location
+        run: |
+          mv ./whatsapp_${{ steps.version.outputs.version }}.apk /mnt/data/whatsapp_${{ steps.version.outputs.version }}.apk
+          
+          if [ -f /mnt/data/whatsapp_${{ steps.version.outputs.version }}.apk ]; then
+            echo "✓ Final APK: /mnt/data/whatsapp_${{ steps.version.outputs.version }}.apk"
+            ls -lh /mnt/data/whatsapp_${{ steps.version.outputs.version }}.apk
+          else
+            echo "❌ Final APK not found"
+            exit 1
+          fi
